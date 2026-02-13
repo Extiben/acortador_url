@@ -1,2 +1,2 @@
-web: gunicorn app:acortador_url
+web: gunicorn acortador_url:app
 
