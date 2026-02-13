@@ -16,6 +16,7 @@ limits==5.8.0
 MarkupSafe==3.0.3
 ordered-set==4.1.0
 packaging==26.0
+psycopg2-binary==2.9.11
 pymongo==4.16.0
 python-dotenv==1.2.1
 SQLAlchemy==2.0.46
