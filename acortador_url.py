@@ -16,7 +16,7 @@ load_dotenv()
 
 app = Flask(__name__)
 
-app.config["SECRET_KEY"] = os.getenv("SECRET_KEY")
+app.config["SECRET_KEY"] = os.getenv("SECRET_KEY", "supersecretkey")
 
 database_url = os.getenv("DATABASE_URL")
 
@@ -58,7 +58,7 @@ class Click(db.Model):
     user_agent = db.Column(db.Text)
     timestamp = db.Column(db.DateTime, default=datetime.utcnow)
 
-# 🔥 CREAR TABLAS EN EL ARRANQUE (FLASK 3 COMPATIBLE)
+# Crear tablas al iniciar
 with app.app_context():
     db.create_all()
 
@@ -66,7 +66,7 @@ with app.app_context():
 
 @login_manager.user_loader
 def load_user(user_id):
-    return User.query.get(int(user_id))
+    return db.session.get(User, int(user_id))
 
 # ---------------- UTILIDADES ----------------
 
@@ -82,6 +82,8 @@ def url_valida(url):
 
 @app.route("/")
 def home():
+    if current_user.is_authenticated:
+        return redirect(url_for("dashboard"))
     return redirect(url_for("login"))
 
 # ---------------- AUTH ----------------
@@ -104,10 +106,12 @@ def register():
     return """
     <h2>Registro</h2>
     <form method="POST">
-        Email: <input name="email"><br>
-        Password: <input name="password" type="password"><br>
+        Email: <input name="email" required><br>
+        Password: <input name="password" type="password" required><br>
         <button>Registrarse</button>
     </form>
+    <br>
+    ¿Ya tienes cuenta? <a href="/login">Inicia sesión</a>
     """
 
 @app.route("/login", methods=["GET", "POST"])
@@ -127,10 +131,12 @@ def login():
     return """
     <h2>Login</h2>
     <form method="POST">
-        Email: <input name="email"><br>
-        Password: <input name="password" type="password"><br>
+        Email: <input name="email" required><br>
+        Password: <input name="password" type="password" required><br>
         <button>Entrar</button>
     </form>
+    <br>
+    ¿No tienes cuenta? <a href="/register">Regístrate aquí</a>
     """
 
 @app.route("/logout")
@@ -180,7 +186,7 @@ def dashboard():
     return f"""
     <h2>Dashboard</h2>
     <form method="POST">
-        URL: <input name="url"><br>
+        URL: <input name="url" required><br>
         Código personalizado: <input name="code"><br>
         <button>Crear Link</button>
     </form>
