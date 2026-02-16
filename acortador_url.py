@@ -2,7 +2,6 @@ import os
 import secrets
 from datetime import datetime
 from urllib.parse import urlparse
-
 from flask import Flask, request, redirect, url_for
 from flask_sqlalchemy import SQLAlchemy
 from flask_login import LoginManager, UserMixin, login_user, login_required, logout_user, current_user
@@ -16,8 +15,16 @@ from dotenv import load_dotenv
 load_dotenv()
 
 app = Flask(__name__)
+
 app.config["SECRET_KEY"] = os.getenv("SECRET_KEY")
-app.config["SQLALCHEMY_DATABASE_URI"] = os.getenv("DATABASE_URL")
+
+database_url = os.getenv("DATABASE_URL")
+
+# 🔥 Fix para Render (postgres:// -> postgresql://)
+if database_url and database_url.startswith("postgres://"):
+    database_url = database_url.replace("postgres://", "postgresql://", 1)
+
+app.config["SQLALCHEMY_DATABASE_URI"] = database_url
 app.config["SQLALCHEMY_TRACK_MODIFICATIONS"] = False
 
 db = SQLAlchemy(app)
@@ -38,18 +45,23 @@ class User(db.Model, UserMixin):
 
 class Link(db.Model):
     id = db.Column(db.Integer, primary_key=True)
-    code = db.Column(db.String(50), unique=True, nullable=False)
+    code = db.Column(db.String(50), unique=True, nullable=False, index=True)
     original_url = db.Column(db.Text, nullable=False)
     clicks = db.Column(db.Integer, default=0)
-    owner_id = db.Column(db.Integer, db.ForeignKey('user.id'))
+    owner_id = db.Column(db.Integer, db.ForeignKey("user.id"))
     created_at = db.Column(db.DateTime, default=datetime.utcnow)
 
 class Click(db.Model):
     id = db.Column(db.Integer, primary_key=True)
-    link_id = db.Column(db.Integer, db.ForeignKey('link.id'))
+    link_id = db.Column(db.Integer, db.ForeignKey("link.id"))
     ip = db.Column(db.String(50))
     user_agent = db.Column(db.Text)
     timestamp = db.Column(db.DateTime, default=datetime.utcnow)
+
+# 🔥 CREAR TABLAS AUTOMÁTICAMENTE EN PRODUCCIÓN
+@app.before_first_request
+def create_tables():
+    db.create_all()
 
 # ---------------- LOGIN ----------------
 
@@ -66,6 +78,12 @@ def generar_codigo(longitud=6):
 def url_valida(url):
     parsed = urlparse(url)
     return parsed.scheme in ["http", "https"] and parsed.netloc
+
+# ---------------- RUTA HOME (EVITA 404 EN "/") ----------------
+
+@app.route("/")
+def home():
+    return redirect(url_for("login"))
 
 # ---------------- AUTH ----------------
 
@@ -173,10 +191,20 @@ def dashboard():
     <a href="/logout">Cerrar sesión</a>
     """
 
+# ---------------- FAVICON ----------------
+
+@app.route("/favicon.ico")
+def favicon():
+    return "", 204
+
 # ---------------- REDIRECT ----------------
 
-@app.route("/<code>")
+@app.route("/<string:code>")
 def redirect_link(code):
+    # evita conflictos con rutas reales
+    if code in ["login", "register", "dashboard", "logout"]:
+        return "Ruta no válida", 404
+
     link = Link.query.filter_by(code=code).first()
 
     if link:
@@ -195,10 +223,8 @@ def redirect_link(code):
 
     return "Link no encontrado", 404
 
-# ---------------- INIT ----------------
+# ---------------- RUN LOCAL ----------------
 
 if __name__ == "__main__":
-    with app.app_context():
-        db.create_all()
     app.run(debug=True)
 
