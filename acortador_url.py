@@ -20,7 +20,7 @@ app.config["SECRET_KEY"] = os.getenv("SECRET_KEY")
 
 database_url = os.getenv("DATABASE_URL")
 
-# 🔥 Fix para Render (postgres:// -> postgresql://)
+# Fix para Render
 if database_url and database_url.startswith("postgres://"):
     database_url = database_url.replace("postgres://", "postgresql://", 1)
 
@@ -58,9 +58,8 @@ class Click(db.Model):
     user_agent = db.Column(db.Text)
     timestamp = db.Column(db.DateTime, default=datetime.utcnow)
 
-# 🔥 CREAR TABLAS AUTOMÁTICAMENTE EN PRODUCCIÓN
-@app.before_first_request
-def create_tables():
+# 🔥 CREAR TABLAS EN EL ARRANQUE (FLASK 3 COMPATIBLE)
+with app.app_context():
     db.create_all()
 
 # ---------------- LOGIN ----------------
@@ -79,7 +78,7 @@ def url_valida(url):
     parsed = urlparse(url)
     return parsed.scheme in ["http", "https"] and parsed.netloc
 
-# ---------------- RUTA HOME (EVITA 404 EN "/") ----------------
+# ---------------- HOME ----------------
 
 @app.route("/")
 def home():
@@ -201,7 +200,6 @@ def favicon():
 
 @app.route("/<string:code>")
 def redirect_link(code):
-    # evita conflictos con rutas reales
     if code in ["login", "register", "dashboard", "logout"]:
         return "Ruta no válida", 404
 
@@ -223,7 +221,7 @@ def redirect_link(code):
 
     return "Link no encontrado", 404
 
-# ---------------- RUN LOCAL ----------------
+# ---------------- LOCAL ----------------
 
 if __name__ == "__main__":
     app.run(debug=True)
